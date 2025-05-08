@@ -81,7 +81,6 @@ module.exports = (wss) => {
 
       const result = await Horario.bulkWrite(bulkOps);
 
-      // Notifica todos os clientes conectados
       notifyClients({
         type: 'bulkUpdate',
         data: horarios
