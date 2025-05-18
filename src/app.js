@@ -1,11 +1,13 @@
 const express = require('express');
 require('dotenv').config();
 require('./config/database');
+
 const cors = require('cors');
 const morgan = require('morgan');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
-const csrf = require('csurf');
+const session = require('express-session');
+const lusca = require('lusca');
 
 module.exports = function (wss) {
   const app = express();
@@ -21,26 +23,35 @@ module.exports = function (wss) {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser(process.env.COOKIE_SECRET || 'sua_chave_secreta'));
+
+  // Adicione o session antes do lusca
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'sessao_segura',
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax'
+    }
+  }));
+
+  // Agora pode usar lusca
+  app.use(lusca.csrf());
+  app.use(lusca.xframe('SAMEORIGIN'));
+  app.use(lusca.xssProtection(true));
+
   app.use(morgan("dev"));
 
-  const csrfProtection = csrf({
-    cookie: {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/'
-    }
-  });
-
-  app.get('/api/csrf-token', csrfProtection, (req, res) => {
+  // Endpoint para obter o token CSRF do cookie da sessão
+  app.get('/api/csrf-token', (req, res) => {
     res.json({ csrfToken: req.csrfToken() });
   });
 
   app.use('/login', require('./routes/auth.routes'));
 
-  app.use('/api/users', csrfProtection, require('./routes/user.routes')(wss));
-  app.use('/api/spaces', csrfProtection, require('./routes/spaces.routes')(wss));
-  app.use('/api/horarios', csrfProtection, require('./routes/horario.routes')(wss));
+  app.use('/api/users', require('./routes/user.routes')(wss));
+  app.use('/api/spaces', require('./routes/spaces.routes')(wss));
+  app.use('/api/horarios', require('./routes/horario.routes')(wss));
 
   app.use((err, req, res, next) => {
     if (err.code === 'EBADCSRFTOKEN') {
