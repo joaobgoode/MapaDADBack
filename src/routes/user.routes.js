@@ -1,11 +1,24 @@
+
 const express = require('express');
-const router = express.Router();
-const userController = require('../controllers/user.controller');
+const authMiddleware = require('../middleware/authMiddleware');
+const checkAdminOrSuperuserJwt = require('../middleware/credentialMiddleware');
 
-router.post('/users', userController.createUser);
-router.get('/users', userController.getAllUsers);
-router.get('/users/:id', userController.getUserById);
-router.put('/users/:id', userController.updateUser);
-router.delete('/users/:id', userController.deleteUser);
+module.exports = (wss) => {
+  const router = express.Router();
 
-module.exports = router;
+  const userController = require('../controllers/user.controller')(wss);
+
+  router.use(authMiddleware);
+
+  router.post('/change-password', userController.changePassword);
+
+  router.post('/', checkAdminOrSuperuserJwt, userController.createUser);
+  router.put('/block/:id', checkAdminOrSuperuserJwt, userController.blockUser);
+  router.get('/', checkAdminOrSuperuserJwt, userController.getAllUsers);
+  router.get('/:id', checkAdminOrSuperuserJwt, userController.getUserById);
+  router.put('/update/:id', checkAdminOrSuperuserJwt, userController.updateUser);
+  router.delete('/:id', checkAdminOrSuperuserJwt, userController.deleteUser);
+
+  return router;
+};
+

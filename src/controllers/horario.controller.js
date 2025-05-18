@@ -1,3 +1,4 @@
+
 const Horario = require('../models/horario.model.js');
 
 module.exports = (wss) => {
@@ -12,6 +13,11 @@ module.exports = (wss) => {
   const changeColor = async (req, res) => {
     try {
       const { space, date, hour, color } = req.body;
+
+      if (!space || !date || !hour || !color) {
+        return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+      }
+
       const options = {
         new: true,
         upsert: true,
@@ -61,6 +67,15 @@ module.exports = (wss) => {
         return res.status(400).json({
           error: 'O array de horários não pode estar vazio'
         });
+      }
+
+      for (const horario of horarios) {
+        const { space, date, hour } = horario;
+        if (!space || !date || !hour) {
+          return res.status(400).json({
+            error: 'Cada horário deve conter os campos obrigatórios: space, date e hour'
+          });
+        }
       }
 
       const bulkOps = horarios.map(horario => {
