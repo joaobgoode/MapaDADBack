@@ -24,7 +24,6 @@ module.exports = function (wss) {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser(process.env.COOKIE_SECRET || 'sua_chave_secreta'));
 
-  // Adicione o session antes do lusca
   app.use(session({
     secret: process.env.SESSION_SECRET || 'sessao_segura',
     resave: false,
@@ -35,20 +34,33 @@ module.exports = function (wss) {
     }
   }));
 
-  // Agora pode usar lusca
   app.use(lusca.csrf());
   app.use(lusca.xframe('SAMEORIGIN'));
   app.use(lusca.xssProtection(true));
 
   app.use(morgan("dev"));
 
-  // Endpoint para obter o token CSRF do cookie da sessão
+  app.use((req, res, next) => {
+    console.log('Sessão ID:', req.sessionID);
+    console.log('Token CSRF recebido:', req.headers['x-csrf-token']);
+    next();
+  });
+
   app.get('/api/csrf-token', (req, res) => {
-    res.json({ csrfToken: req.csrfToken() });
+    if (!req.session) {
+      return res.status(500).json({ error: 'Sessão não iniciada' });
+    }
+
+    try {
+      const csrfToken = req.csrfToken();
+      res.json({ csrfToken });
+    } catch (err) {
+      console.error('Erro ao gerar token CSRF:', err);
+      res.status(500).json({ error: 'Erro ao gerar token CSRF' });
+    }
   });
 
   app.use('/login', require('./routes/auth.routes'));
-
   app.use('/api/users', require('./routes/user.routes')(wss));
   app.use('/api/spaces', require('./routes/spaces.routes')(wss));
   app.use('/api/horarios', require('./routes/horario.routes')(wss));
